@@ -1,0 +1,110 @@
+"use client";
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+export default function Register() {
+  const [organization, setOrganization] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+    
+    try {
+      const response = await fetch("http://localhost:8000/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, organization_name: organization }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Error al registrar la organización");
+      }
+      
+      // On successful registration, auto-redirect to login
+      router.push("/login?registered=true");
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
+      <Link href="/" className="mb-8 text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-500">
+        SalesPredict AI
+      </Link>
+      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl p-8 shadow-2xl relative overflow-hidden">
+         {/* Decorative subtle top glow */}
+         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+
+        <h2 className="text-3xl font-bold text-center text-slate-50 mb-2">Crear Cuenta</h2>
+        <p className="text-slate-400 text-center mb-8">Registra tu organización</p>
+        
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/50 text-red-500 text-sm p-3 rounded-lg mb-6 flex items-center">
+            <span className="mr-2">⚠️</span> {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Nombre de la Organización</label>
+            <input
+              type="text"
+              required
+              className="w-full px-4 py-3 bg-slate-950 border border-slate-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-slate-50 transition-colors"
+              placeholder="Acme Inc."
+              value={organization}
+              onChange={(e) => setOrganization(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Correo Electrónico (Administrador)</label>
+            <input
+              type="email"
+              required
+              className="w-full px-4 py-3 bg-slate-950 border border-slate-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-slate-50 transition-colors"
+              placeholder="admin@empresa.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Contraseña</label>
+            <input
+              type="password"
+              required
+              className="w-full px-4 py-3 bg-slate-950 border border-slate-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-slate-50 transition-colors"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition-all transform hover:-translate-y-[1px] disabled:opacity-50 disabled:transform-none shadow-[0_0_15px_rgba(99,102,241,0.3)]"
+          >
+            {isLoading ? "Creando cuenta..." : "Registrar Organización"}
+          </button>
+        </form>
+        
+        <p className="mt-6 text-center text-slate-400 text-sm">
+          ¿Ya tienes una cuenta?{" "}
+          <Link href="/login" className="text-indigo-400 hover:text-indigo-300 font-medium">
+            Inicia sesión aquí
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}
