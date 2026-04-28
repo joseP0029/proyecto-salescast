@@ -115,7 +115,10 @@ export default function Dashboard() {
               <Tooltip 
                 contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', color: '#f8fafc', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)' }}
                 itemStyle={{ color: '#f8fafc', fontWeight: 500 }}
-                formatter={(value: number) => [`$${value}`, ""]}
+                formatter={(value) => {
+                  if (value == null) return ["$0", ""];
+                  return [`$${value}`, ""];
+                }}
                 labelStyle={{ color: '#94a3b8', marginBottom: '8px' }}
               />
               <Area type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorActual)" activeDot={{ r: 6, fill: '#3b82f6', stroke: '#0f172a', strokeWidth: 2 }} />
