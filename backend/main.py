@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
 from routes import auth
+import sentry_sdk
+
 
 sentry_sdk.init(
     dsn="https://5f7d4adbaa21ac09bc45ccd00eb130f8@o4511303616823296.ingest.us.sentry.io/4511303639629824",
