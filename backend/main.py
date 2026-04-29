@@ -29,3 +29,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 @app.get("/")
 def read_root():
     return {"message": "Sales Prediction API is running"}
+
+@app.get("/sentry-debug")
+async def trigger_error():
+    1 / 0
