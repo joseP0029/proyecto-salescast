@@ -1,9 +1,12 @@
 from fastapi.testclient import TestClient
 from main import app
 import uuid
-
+from database import Base, engine
 
 client = TestClient(app)
+# Crear tablas antes de tests
+Base.metadata.create_all(bind=engine)
+
 
 def test_login():
     response = client.post("/api/auth/login", json={
