@@ -3,6 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
 from routes import auth
 
+sentry_sdk.init(
+    dsn="https://5f7d4adbaa21ac09bc45ccd00eb130f8@o4511303616823296.ingest.us.sentry.io/4511303639629824",
+    send_default_pii=True,
+    traces_sample_rate=1.0,
+)
 
 app = FastAPI(title="Sales Prediction API")
 
