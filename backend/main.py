@@ -3,10 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
 from routes import auth
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Sales Prediction API")
+
+@app.on_event("startup")
+def startup():
+    Base.metadata.create_all(bind=engine)
+
 
 app.add_middleware(
     CORSMiddleware,
