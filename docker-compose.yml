@@ -6,7 +6,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://postgres:claudiaesther1@db:5432/sales_prediction
+      DATABASE_URL: postgresql://postgres:pass@db:5432/sales_prediction
     depends_on:
       - db
 
