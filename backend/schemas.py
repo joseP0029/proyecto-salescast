@@ -55,6 +55,10 @@ class ModelResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class PredictionRequest(BaseModel):
+    model_id: int
+    days_to_predict: int
+
 class PredictionResponse(BaseModel):
     target_date: datetime
     store_nbr: Optional[int] = None
