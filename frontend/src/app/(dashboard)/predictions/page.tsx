@@ -239,7 +239,7 @@ export default function PredictionsPage() {
                     <Tooltip 
                       contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '0.5rem', color: '#f8fafc' }}
                       itemStyle={{ color: '#60a5fa' }}
-                      formatter={(value: number) => [`$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 'Ventas']}
+                      formatter={(value: any) => [`$${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 'Ventas']}
                     />
                     <Legend wrapperStyle={{ paddingTop: '20px' }} />
                     <Line 
