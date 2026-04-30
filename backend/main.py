@@ -1,9 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
-from routes import auth
+from routes import auth, predictions
 import sentry_sdk
-
 
 sentry_sdk.init(
     dsn="https://5f7d4adbaa21ac09bc45ccd00eb130f8@o4511303616823296.ingest.us.sentry.io/4511303639629824",
@@ -27,6 +26,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(predictions.router, prefix="/api/predictions", tags=["predictions"])
 
 @app.get("/")
 def read_root():

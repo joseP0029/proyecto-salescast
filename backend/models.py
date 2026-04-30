@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Enum as SQLEnum, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Enum as SQLEnum, DateTime, ForeignKey, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from database import Base
@@ -28,3 +28,39 @@ class User(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     organization = relationship("Organization", back_populates="users")
+
+class Dataset(Base):
+    __tablename__ = "datasets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    filename = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)
+    uploaded_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    organization = relationship("Organization", backref="datasets")
+
+class MLModel(Base):
+    __tablename__ = "ml_models"
+
+    id = Column(Integer, primary_key=True, index=True)
+    dataset_id = Column(Integer, ForeignKey("datasets.id"), nullable=False)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    model_path = Column(String, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    dataset = relationship("Dataset", backref="models")
+    organization = relationship("Organization", backref="models")
+
+class Prediction(Base):
+    __tablename__ = "predictions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    model_id = Column(Integer, ForeignKey("ml_models.id"), nullable=False)
+    target_date = Column(DateTime, nullable=False)
+    predicted_value = Column(Float, nullable=False)
+    store_nbr = Column(Integer, nullable=True)
+    family = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    ml_model = relationship("MLModel", backref="predictions")

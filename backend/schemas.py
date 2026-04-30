@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from enum import Enum
 
 class RoleEnum(str, Enum):
@@ -40,3 +40,25 @@ class UserWithOrgResponse(UserResponse):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+class DatasetResponse(BaseModel):
+    id: int
+    filename: str
+    uploaded_at: datetime
+    class Config:
+        from_attributes = True
+
+class ModelResponse(BaseModel):
+    id: int
+    dataset_id: int
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+class PredictionResponse(BaseModel):
+    target_date: datetime
+    store_nbr: Optional[int] = None
+    family: Optional[str] = None
+    predicted_value: float
+    class Config:
+        from_attributes = True
