@@ -12,7 +12,10 @@ export default function UploadPage() {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState("");
-  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+  
+  // Clean API URL in case it has trailing slash
+  const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+  const API_URL = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
 
   const fetchHistory = async () => {
     try {
@@ -35,10 +38,7 @@ export default function UploadPage() {
     fetchHistory();
   }, []);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    
-    const file = e.target.files[0];
+  const processFile = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
     
@@ -56,8 +56,14 @@ export default function UploadPage() {
       });
       
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.detail || "Error al subir archivo");
+        let errorMsg = "Error al subir archivo";
+        try {
+            const data = await res.json();
+            errorMsg = data.detail || errorMsg;
+        } catch(e) {
+            errorMsg = `Error del servidor: ${res.status} ${res.statusText}`;
+        }
+        throw new Error(errorMsg);
       }
       
       await fetchHistory();
@@ -65,8 +71,25 @@ export default function UploadPage() {
       setError(err.message);
     } finally {
       setIsUploading(false);
-      e.target.value = ''; // reset input
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    processFile(e.target.files[0]);
+    e.target.value = ''; // reset input
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (isUploading) return;
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
   };
 
   return (
@@ -82,8 +105,12 @@ export default function UploadPage() {
 
       {/* Dropzone */}
       <div className="mt-8">
-        <label className={`flex justify-center w-full h-64 px-4 transition bg-slate-900 border-2 border-slate-700 ${isUploading ? 'border-solid opacity-70' : 'border-dashed cursor-pointer hover:border-blue-500 hover:bg-slate-800/50'} rounded-xl appearance-none group relative`}>
-          <span className="flex flex-col items-center justify-center space-y-4">
+        <label 
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          className={`flex justify-center w-full h-64 px-4 transition bg-slate-900 border-2 border-slate-700 ${isUploading ? 'border-solid opacity-70' : 'border-dashed cursor-pointer hover:border-blue-500 hover:bg-slate-800/50'} rounded-xl appearance-none group relative`}
+        >
+          <span className="flex flex-col items-center justify-center space-y-4 pointer-events-none">
             {isUploading ? (
               <>
                 <div className="p-4 bg-blue-500/10 rounded-full animate-pulse">
@@ -97,7 +124,7 @@ export default function UploadPage() {
                   <UploadCloud className="w-10 h-10 text-blue-500" />
                 </div>
                 <span className="font-medium text-slate-300">
-                  Suelta los archivos aquí, o <span className="text-blue-500 underline">explora</span>
+                  Suelta los archivos aquí, o <span className="text-blue-500 underline pointer-events-auto">explora</span>
                 </span>
                 <span className="text-sm text-slate-500">Soporta .csv hasta 50MB</span>
               </>
@@ -114,7 +141,7 @@ export default function UploadPage() {
         </label>
       </div>
 
-      {/* Mocked History -> Actual History */}
+      {/* Actual History */}
       <h2 className="text-lg font-semibold text-slate-50 mt-10 mb-4">Cargas Recientes</h2>
       <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
         {datasets.length === 0 ? (
