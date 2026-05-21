@@ -15,6 +15,12 @@ app = FastAPI(title="Sales Prediction API")
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
+    try:
+        from sqlalchemy import text
+        with engine.begin() as conn:
+            conn.execute(text('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE NOT NULL;'))
+    except Exception as e:
+        print(f"Migration error: {e}")
 
 
 app.add_middleware(
