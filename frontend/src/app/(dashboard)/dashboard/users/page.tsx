@@ -19,6 +19,12 @@ export default function UsersManagementPage() {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [error, setError] = useState("");
 
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetUserId, setResetUserId] = useState<number | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [resetError, setResetError] = useState("");
+  const [resetSuccess, setResetSuccess] = useState("");
+
   useEffect(() => {
     if (isLoading) return;
     if (!user || user.role !== "admin") {
@@ -106,6 +112,43 @@ export default function UsersManagementPage() {
     }
   };
 
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetUserId || !newPassword) return;
+
+    setResetError("");
+    setResetSuccess("");
+
+    try {
+      const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const API_URL = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+      
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/api/users/${resetUserId}/password`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ new_password: newPassword }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || "Error al cambiar contraseña");
+      }
+
+      setResetSuccess("Contraseña cambiada exitosamente");
+      setTimeout(() => {
+        setResetModalOpen(false);
+        setNewPassword("");
+        setResetSuccess("");
+      }, 2000);
+    } catch (err: any) {
+      setResetError(err.message);
+    }
+  };
+
   if (isLoading || loadingUsers) {
     return <div className="text-white">Cargando...</div>;
   }
@@ -173,6 +216,18 @@ export default function UsersManagementPage() {
                     >
                       {u.is_active ? 'Desactivar' : 'Activar'}
                     </button>
+                    <button
+                      onClick={() => {
+                        setResetUserId(u.id);
+                        setNewPassword("");
+                        setResetError("");
+                        setResetSuccess("");
+                        setResetModalOpen(true);
+                      }}
+                      className="text-amber-400 hover:text-amber-300 transition-colors font-medium"
+                    >
+                      Contraseña
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -180,6 +235,53 @@ export default function UsersManagementPage() {
           </table>
         </div>
       </div>
+
+      {resetModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-xl w-full max-w-md">
+            <h3 className="text-xl font-bold text-white mb-4">Restablecer Contraseña</h3>
+            <p className="text-sm text-slate-400 mb-6">
+              Ingresa la nueva contraseña para el usuario seleccionado.
+            </p>
+            
+            <form onSubmit={handlePasswordReset}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Nueva Contraseña
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              {resetError && <p className="text-red-400 text-sm mb-4">{resetError}</p>}
+              {resetSuccess && <p className="text-green-400 text-sm mb-4">{resetSuccess}</p>}
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setResetModalOpen(false)}
+                  className="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newPassword || !!resetSuccess}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg transition-colors font-medium"
+                >
+                  Guardar Contraseña
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

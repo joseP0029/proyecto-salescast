@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from database import get_db
-import models, schemas
+import models, schemas, security
 from routes.auth import get_current_user
 
 router = APIRouter()
@@ -77,6 +77,27 @@ def update_user_status(
         raise HTTPException(status_code=400, detail="Cannot deactivate yourself")
 
     user.is_active = status_update.is_active
+    db.commit()
+    db.refresh(user)
+    return user
+
+@router.patch("/{user_id}/password", response_model=schemas.UserResponse)
+def reset_user_password(
+    user_id: int,
+    password_reset: schemas.UserPasswordReset,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin)
+):
+    """Reset a user's password (admin only)"""
+    user = db.query(models.User).filter(
+        models.User.id == user_id,
+        models.User.organization_id == current_user.organization_id
+    ).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.hashed_password = security.get_password_hash(password_reset.new_password)
     db.commit()
     db.refresh(user)
     return user

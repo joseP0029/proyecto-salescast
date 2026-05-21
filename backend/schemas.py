@@ -41,6 +41,9 @@ class UserRoleUpdate(BaseModel):
 class UserStatusUpdate(BaseModel):
     is_active: bool
 
+class UserPasswordReset(BaseModel):
+    new_password: str
+
 class UserWithOrgResponse(UserResponse):
     organization: Organization
 
