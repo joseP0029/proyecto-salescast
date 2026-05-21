@@ -28,8 +28,11 @@ export default function UsersManagementPage() {
 
     const fetchUsers = async () => {
       try {
+        const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+        const API_URL = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+        
         const token = localStorage.getItem("token");
-        const res = await fetch("http://localhost:8000/api/users/", {
+        const res = await fetch(`${API_URL}/api/users/`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -53,8 +56,11 @@ export default function UsersManagementPage() {
 
   const handleRoleChange = async (userId: number, newRole: "admin" | "analyst") => {
     try {
+      const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const API_URL = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+      
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:8000/api/users/${userId}/role`, {
+      const res = await fetch(`${API_URL}/api/users/${userId}/role`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -76,8 +82,11 @@ export default function UsersManagementPage() {
 
   const handleStatusChange = async (userId: number, isActive: boolean) => {
     try {
+      const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const API_URL = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+      
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:8000/api/users/${userId}/status`, {
+      const res = await fetch(`${API_URL}/api/users/${userId}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

@@ -40,7 +40,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       try {
-        const response = await fetch("http://localhost:8000/api/auth/me", {
+        const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+        const API_URL = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+        
+        const response = await fetch(`${API_URL}/api/auth/me`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
