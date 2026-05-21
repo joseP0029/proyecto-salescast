@@ -84,16 +84,3 @@ npm run dev
 
 La aplicación estará disponible en `http://localhost:3000`.
 
----
-
-## ☁️ Despliegue en Producción (Render)
-
-El proyecto está preparado para ser desplegado en plataformas como Render:
-1.  **Backend Web Service**: Construido a partir del directorio `backend/`. El comando de inicio debe ser `uvicorn main:app --host 0.0.0.0 --port $PORT`. Se debe asegurar la persistencia mediante *Render Disks* en las carpetas `uploads/` y `models_storage/`.
-2.  **Frontend Static Site / Web Service**: Construido a partir del directorio `frontend/`. Requiere configurar la variable `NEXT_PUBLIC_API_URL` apuntando a la URL pública del backend desplegado antes de ejecutar el build (`npm run build`).
-
----
-
-## 👥 Contribuciones y Soporte
-
-Si deseas contribuir, por favor abre un *Issue* o un *Pull Request* describiendo los cambios detalladamente. Para dudas sobre la arquitectura o los modelos, consulta los directorios `/backend/routes` y `/backend/ml_service.py`.
