@@ -37,18 +37,28 @@ def register(user_data: schemas.UserRegister, db: Session = Depends(get_db)):
     
     # Check if organization exists, else create
     db_org = db.query(models.Organization).filter(models.Organization.name == user_data.organization_name).first()
+    is_first_user = False
     if not db_org:
         db_org = models.Organization(name=user_data.organization_name)
         db.add(db_org)
         db.commit()
         db.refresh(db_org)
+        is_first_user = True
+    else:
+        # Check if org has any users
+        user_count = db.query(models.User).filter(models.User.organization_id == db_org.id).count()
+        if user_count == 0:
+            is_first_user = True
     
     # Create user
     hashed_password = security.get_password_hash(user_data.password)
+    user_role = models.RoleEnum.admin if is_first_user else models.RoleEnum.analyst
+
     new_user = models.User(
         email=user_data.email,
         hashed_password=hashed_password,
-        role=models.RoleEnum.admin,
+        role=user_role,
+        is_active=True,
         organization_id=db_org.id
     )
     db.add(new_user)
@@ -65,6 +75,11 @@ def login(user_data: schemas.UserLogin, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Inactive user",
         )
     access_token = security.create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}

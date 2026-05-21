@@ -29,10 +29,17 @@ class UserLogin(UserBase):
 class UserResponse(UserBase):
     id: int
     role: RoleEnum
+    is_active: bool
     organization_id: int
     created_at: datetime
     class Config:
         from_attributes = True
+
+class UserRoleUpdate(BaseModel):
+    role: RoleEnum
+
+class UserStatusUpdate(BaseModel):
+    is_active: bool
 
 class UserWithOrgResponse(UserResponse):
     organization: Organization

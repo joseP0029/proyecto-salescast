@@ -1,6 +1,8 @@
 "use client";
 import { UploadCloud, FileSpreadsheet, CheckCircle2, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 interface Dataset {
   id: number;
@@ -12,6 +14,14 @@ export default function UploadPage() {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState("");
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && user?.role !== "admin") {
+      router.push("/dashboard");
+    }
+  }, [user, isLoading, router]);
   
   // Clean API URL in case it has trailing slash
   const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
@@ -91,6 +101,10 @@ export default function UploadPage() {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
+
+  if (isLoading || user?.role !== "admin") {
+    return null;
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-4xl">

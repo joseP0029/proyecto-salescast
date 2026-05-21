@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Enum as SQLEnum, DateTime, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, Enum as SQLEnum, DateTime, ForeignKey, Float, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from database import Base
@@ -24,6 +24,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     role = Column(SQLEnum(RoleEnum), default=RoleEnum.admin, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 

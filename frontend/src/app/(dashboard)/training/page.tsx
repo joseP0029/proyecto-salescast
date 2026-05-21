@@ -1,6 +1,8 @@
 "use client";
 import { BrainCircuit, Play, Database, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 interface Dataset {
   id: number;
@@ -20,6 +22,14 @@ export default function TrainingPage() {
   const [isTraining, setIsTraining] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && user?.role !== "admin") {
+      router.push("/dashboard");
+    }
+  }, [user, isLoading, router]);
   
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -75,6 +85,10 @@ export default function TrainingPage() {
   };
 
   const latestModel = models.length > 0 ? models[models.length - 1] : null;
+
+  if (isLoading || user?.role !== "admin") {
+    return null;
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">

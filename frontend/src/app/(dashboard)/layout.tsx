@@ -2,28 +2,15 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { LayoutDashboard, Upload, BrainCircuit, LineChart, LogOut, Settings } from "lucide-react";
+import { LayoutDashboard, Upload, BrainCircuit, LineChart, LogOut, Settings, Users } from "lucide-react";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+function DashboardSidebar({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [isAuthorized, setIsAuthorized] = useState(false);
+  const { user, isLoading, logout } = useAuth();
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-    } else {
-      setIsAuthorized(true);
-    }
-  }, [router]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    router.push("/login");
-  };
-
-  if (!isAuthorized) {
+  if (isLoading || !user) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="w-8 h-8 flex border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -31,12 +18,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
-  const navLinks = [
+  const handleLogout = () => {
+    logout();
+  };
+
+  let navLinks = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/upload", icon: Upload, label: "Subir Datos" },
     { href: "/training", icon: BrainCircuit, label: "Modelos y Entrenamiento" },
     { href: "/predictions", icon: LineChart, label: "Predicciones" },
   ];
+
+  if (user.role === "admin") {
+    navLinks.push({ href: "/dashboard/users", icon: Users, label: "Gestión de Usuarios" });
+  } else {
+    // Analyst only sees Dashboard and Predictions
+    navLinks = navLinks.filter(link => 
+      link.href === "/dashboard" || link.href === "/predictions"
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 flex text-slate-50 overflow-hidden">
@@ -112,5 +112,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
       </div>
     </div>
+  );
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthProvider>
+      <DashboardSidebar>{children}</DashboardSidebar>
+    </AuthProvider>
   );
 }
