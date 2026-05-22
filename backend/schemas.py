@@ -76,3 +76,8 @@ class PredictionResponse(BaseModel):
     predicted_value: float
     class Config:
         from_attributes = True
+
+class PredictionRunResponse(BaseModel):
+    model_id: int
+    created_at: datetime
+    prediction_count: int

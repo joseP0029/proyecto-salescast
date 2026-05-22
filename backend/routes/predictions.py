@@ -3,6 +3,8 @@ import shutil
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List
+from datetime import datetime, timezone
+from sqlalchemy import func
 
 from database import get_db
 import models, schemas
@@ -95,13 +97,15 @@ def predict(
         
     # Save predictions to DB
     db_predictions = []
+    run_timestamp = datetime.now(timezone.utc)
     for p in preds:
         db_pred = models.Prediction(
             model_id=ml_model.id,
             target_date=p['target_date'],
             predicted_value=p['predicted_value'],
             store_nbr=p['store_nbr'],
-            family=p['family']
+            family=p['family'],
+            created_at=run_timestamp
         )
         db.add(db_pred)
         db_predictions.append(db_pred)
@@ -122,3 +126,73 @@ def get_history(
         "datasets": datasets,
         "models": models_list
     }
+
+@router.get("/runs", response_model=List[schemas.PredictionRunResponse])
+def get_prediction_runs(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Obtiene el historial agrupado de predicciones (las 'sesiones' o 'lotes')"""
+    # Join with MLModel to filter by organization
+    runs = db.query(
+        models.Prediction.model_id,
+        models.Prediction.created_at,
+        func.count(models.Prediction.id).label('prediction_count')
+    ).join(models.MLModel).filter(
+        models.MLModel.organization_id == current_user.organization_id
+    ).group_by(
+        models.Prediction.model_id,
+        models.Prediction.created_at
+    ).order_by(models.Prediction.created_at.desc()).all()
+    
+    return [
+        {"model_id": r.model_id, "created_at": r.created_at, "prediction_count": r.prediction_count}
+        for r in runs
+    ]
+
+@router.get("/runs/{model_id}/{created_at}", response_model=List[schemas.PredictionResponse])
+def get_prediction_run_details(
+    model_id: int,
+    created_at: datetime,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Obtiene los detalles de un lote específico de predicciones"""
+    ml_model = db.query(models.MLModel).filter(
+        models.MLModel.id == model_id,
+        models.MLModel.organization_id == current_user.organization_id
+    ).first()
+    
+    if not ml_model:
+        raise HTTPException(status_code=404, detail="Model not found or unauthorized")
+        
+    preds = db.query(models.Prediction).filter(
+        models.Prediction.model_id == model_id,
+        models.Prediction.created_at == created_at
+    ).all()
+    
+    return preds
+
+@router.delete("/runs/{model_id}/{created_at}", status_code=204)
+def delete_prediction_run(
+    model_id: int,
+    created_at: datetime,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Elimina un lote específico de predicciones"""
+    ml_model = db.query(models.MLModel).filter(
+        models.MLModel.id == model_id,
+        models.MLModel.organization_id == current_user.organization_id
+    ).first()
+    
+    if not ml_model:
+        raise HTTPException(status_code=404, detail="Model not found or unauthorized")
+        
+    db.query(models.Prediction).filter(
+        models.Prediction.model_id == model_id,
+        models.Prediction.created_at == created_at
+    ).delete(synchronize_session=False)
+    db.commit()
+    
+    return None
