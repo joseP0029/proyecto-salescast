@@ -43,16 +43,16 @@ export default function PredictionsPage() {
   const [models, setModels] = useState<MLModel[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [horizon, setHorizon] = useState<string>("30");
-  
+
   const [isPredicting, setIsPredicting] = useState(false);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [insights, setInsights] = useState<Insights | null>(null);
   const [error, setError] = useState("");
-  
+
   const [selectedStore, setSelectedStore] = useState<string>("all");
 
   const [runs, setRuns] = useState<PredictionRun[]>([]);
-  const [selectedRun, setSelectedRun] = useState<{model_id: number, created_at: string} | null>(null);
+  const [selectedRun, setSelectedRun] = useState<{ model_id: number, created_at: string } | null>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -61,7 +61,7 @@ export default function PredictionsPage() {
       const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
       const baseUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
       const token = localStorage.getItem("token");
-      
+
       // Fetch models
       const resModels = await fetch(`${baseUrl}/api/predictions/history`, {
         headers: { "Authorization": `Bearer ${token}` }
@@ -96,12 +96,12 @@ export default function PredictionsPage() {
       setError("Por favor selecciona un modelo");
       return;
     }
-    
+
     setIsPredicting(true);
     setError("");
     setPredictions([]);
     setSelectedStore("all");
-    
+
     try {
       const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
       const baseUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
@@ -117,12 +117,12 @@ export default function PredictionsPage() {
           days_to_predict: parseInt(horizon)
         })
       });
-      
+
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.detail || "Error al generar predicciones");
       }
-      
+
       const data = await res.json();
       setPredictions(data);
       // Generate forecast endpoint doesn't return insights yet in the same way,
@@ -132,7 +132,7 @@ export default function PredictionsPage() {
       // Since `predict` returns a list of predictions, and we get insights from `runs`,
       // we can fetch the run details right after generating it to get the insights cleanly.
       setIsPredicting(false);
-      fetchHistory(); 
+      fetchHistory();
     } catch (err: any) {
       setError(err.message);
       setIsPredicting(false);
@@ -146,15 +146,15 @@ export default function PredictionsPage() {
       const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
       const baseUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
       const token = localStorage.getItem("token");
-      
+
       const res = await fetch(`${baseUrl}/api/predictions/runs/${model_id}/${created_at}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
-      
+
       if (!res.ok) {
         throw new Error("Error al cargar la predicción");
       }
-      
+
       const data = await res.json();
       setPredictions(data.predictions);
       setInsights(data.insights);
@@ -167,26 +167,26 @@ export default function PredictionsPage() {
 
   const handleDeleteRun = async (model_id: number, created_at: string) => {
     if (!confirm("¿Estás seguro de eliminar este historial de predicción?")) return;
-    
+
     try {
       const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
       const baseUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
       const token = localStorage.getItem("token");
-      
+
       const res = await fetch(`${baseUrl}/api/predictions/runs/${model_id}/${created_at}`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` }
       });
-      
+
       if (!res.ok) {
         throw new Error("Error al eliminar la predicción");
       }
-      
+
       if (selectedRun?.model_id === model_id && selectedRun?.created_at === created_at) {
         setPredictions([]);
         setSelectedRun(null);
       }
-      
+
       fetchHistory();
     } catch (err: any) {
       setError(err.message);
@@ -203,21 +203,21 @@ export default function PredictionsPage() {
   // Format data for chart
   const chartData = useMemo(() => {
     if (predictions.length === 0) return [];
-    
+
     // Filter by store if needed
-    const filtered = selectedStore === "all" 
-      ? predictions 
+    const filtered = selectedStore === "all"
+      ? predictions
       : predictions.filter(p => p.store_nbr.toString() === selectedStore);
-      
+
     // Aggregate sales by date (if all stores or all families)
     const aggregated: Record<string, number> = {};
-    
+
     filtered.forEach(p => {
       const dateStr = new Date(p.target_date).toLocaleDateString();
       if (!aggregated[dateStr]) aggregated[dateStr] = 0;
       aggregated[dateStr] += p.predicted_value;
     });
-    
+
     return Object.entries(aggregated)
       .map(([date, sales]) => ({ date, sales }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -228,7 +228,7 @@ export default function PredictionsPage() {
         return {
           ...item,
           range: [
-            Math.max(0, item.sales - marginValue), 
+            Math.max(0, item.sales - marginValue),
             item.sales + marginValue
           ]
         };
@@ -241,13 +241,13 @@ export default function PredictionsPage() {
         <h1 className="text-2xl font-bold text-slate-50 tracking-tight">Predicciones de Ventas</h1>
         <p className="text-slate-400 mt-1">Genera pronósticos de ventas futuras basados en tu modelo entrenado.</p>
       </div>
-      
+
       {error && (
         <div className="bg-red-500/10 border border-red-500/50 text-red-500 text-sm p-3 rounded-lg flex items-center">
           <span className="mr-2">⚠️</span> {error}
         </div>
       )}
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-6">
         {/* Controls Sidebar */}
         <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-xl p-6 h-fit shadow-sm">
@@ -255,11 +255,11 @@ export default function PredictionsPage() {
             <Settings2 className="w-5 h-5 text-slate-300" />
             <h2 className="font-semibold text-slate-200">Parámetros</h2>
           </div>
-          
+
           <div className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-2">Modelo</label>
-              <select 
+              <select
                 value={selectedModelId}
                 onChange={(e) => setSelectedModelId(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-700/50 rounded-lg px-3 py-2.5 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
@@ -272,7 +272,7 @@ export default function PredictionsPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-2">Horizonte de Pronóstico</label>
-              <select 
+              <select
                 value={horizon}
                 onChange={(e) => setHorizon(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-700/50 rounded-lg px-3 py-2.5 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
@@ -283,8 +283,8 @@ export default function PredictionsPage() {
                 <option value="90">Próximos 90 Días</option>
               </select>
             </div>
-            
-            <button 
+
+            <button
               onClick={handlePredict}
               disabled={isPredicting || !selectedModelId}
               className="w-full mt-6 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white py-2.5 rounded-lg font-medium transition-colors shadow-[0_0_15px_rgba(37,99,235,0.3)] flex justify-center items-center gap-2"
@@ -295,8 +295,8 @@ export default function PredictionsPage() {
 
             {predictions.length > 0 && (
               <div className="pt-4 mt-4 border-t border-slate-800">
-                 <label className="block text-sm font-medium text-slate-400 mb-2">Filtro Visual: Tienda</label>
-                 <select 
+                <label className="block text-sm font-medium text-slate-400 mb-2">Filtro Visual: Tienda</label>
+                <select
                   value={selectedStore}
                   onChange={(e) => setSelectedStore(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-700/50 rounded-lg px-3 py-2.5 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
@@ -330,44 +330,45 @@ export default function PredictionsPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                    <XAxis 
-                      dataKey="date" 
-                      stroke="#94a3b8" 
-                      tick={{ fill: '#94a3b8' }} 
+                    <XAxis
+                      dataKey="date"
+                      stroke="#94a3b8"
+                      tick={{ fill: '#94a3b8' }}
                       tickMargin={10}
                     />
-                    <YAxis 
-                      stroke="#94a3b8" 
-                      tick={{ fill: '#94a3b8' }} 
-                      tickFormatter={(value) => `$${(value/1000).toFixed(0)}k`} 
+                    <YAxis
+                      stroke="#94a3b8"
+                      tick={{ fill: '#94a3b8' }}
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                     />
-                    <Tooltip 
+                    <Tooltip
                       contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '0.5rem', color: '#f8fafc' }}
                       itemStyle={{ color: '#60a5fa' }}
-                      formatter={(value: any, name: string) => {
-                        if (name === "range") return null; // Hide range from tooltip
+                      formatter={(value: any, name?: string | number) => {
+                        const nameStr = String(name); // Ensure name is treated as a string
+                        if (nameStr === "range") return null; // Hide range from tooltip
                         return [`$${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 'Ventas'];
                       }}
                     />
                     <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                    <Area 
-                      type="monotone" 
-                      dataKey="range" 
-                      name="Margen de Predicción" 
-                      fill="#3b82f6" 
-                      fillOpacity={0.15} 
-                      stroke="none" 
+                    <Area
+                      type="monotone"
+                      dataKey="range"
+                      name="Margen de Predicción"
+                      fill="#3b82f6"
+                      fillOpacity={0.15}
+                      stroke="none"
                       legendType="none"
                       tooltipType="none"
                     />
-                    <Line 
-                      type="monotone" 
-                      dataKey="sales" 
-                      name="Ventas Predichas" 
-                      stroke="#3b82f6" 
-                      strokeWidth={3} 
-                      dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }} 
-                      activeDot={{ r: 6, stroke: '#60a5fa', strokeWidth: 2 }} 
+                    <Line
+                      type="monotone"
+                      dataKey="sales"
+                      name="Ventas Predichas"
+                      stroke="#3b82f6"
+                      strokeWidth={3}
+                      dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }}
+                      activeDot={{ r: 6, stroke: '#60a5fa', strokeWidth: 2 }}
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -382,7 +383,7 @@ export default function PredictionsPage() {
         <div className="mt-8">
           <h2 className="text-xl font-bold text-slate-50 mb-4">Insights de la Proyección</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            
+
             {/* Total Projected */}
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm flex flex-col justify-between hover:border-slate-700 transition-colors">
               <div className="flex items-center gap-3 mb-3">
@@ -419,9 +420,9 @@ export default function PredictionsPage() {
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm flex flex-col justify-between hover:border-slate-700 transition-colors">
               <div className="flex items-center gap-3 mb-3">
                 <div className={`p-2.5 rounded-lg ${insights.trend === 'upward' ? 'bg-green-500/10' : insights.trend === 'downward' ? 'bg-red-500/10' : 'bg-blue-500/10'}`}>
-                  {insights.trend === 'upward' ? <TrendingUp className="w-5 h-5 text-green-400" /> : 
-                   insights.trend === 'downward' ? <TrendingDown className="w-5 h-5 text-red-400" /> : 
-                   <Minus className="w-5 h-5 text-blue-400" />}
+                  {insights.trend === 'upward' ? <TrendingUp className="w-5 h-5 text-green-400" /> :
+                    insights.trend === 'downward' ? <TrendingDown className="w-5 h-5 text-red-400" /> :
+                      <Minus className="w-5 h-5 text-blue-400" />}
                 </div>
                 <h3 className="font-semibold text-slate-300 text-sm">Tendencia General</h3>
               </div>
@@ -469,14 +470,14 @@ export default function PredictionsPage() {
           </div>
         </div>
       )}
-      
+
       {/* Prediction History */}
       <div className="mt-8 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
         <div className="p-6 border-b border-slate-800 flex items-center gap-2">
           <History className="w-5 h-5 text-indigo-400" />
           <h2 className="text-lg font-semibold text-slate-200">Historial de Pronósticos</h2>
         </div>
-        
+
         {runs.length === 0 ? (
           <div className="p-8 text-center text-slate-500">No hay predicciones guardadas todavía.</div>
         ) : (
