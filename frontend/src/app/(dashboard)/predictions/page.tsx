@@ -28,7 +28,7 @@ interface Prediction {
 interface PredictionRun {
   model_id: number;
   created_at: string;
-  prediction_count: int;
+  prediction_count: number;
 }
 
 export default function PredictionsPage() {
