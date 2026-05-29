@@ -1,5 +1,5 @@
 "use client";
-import { LineChart as LineChartIcon, Settings2, Loader2 } from "lucide-react";
+import { LineChart as LineChartIcon, Settings2, Loader2, History, Trash2, Eye } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import {
   LineChart,
@@ -25,6 +25,12 @@ interface Prediction {
   predicted_value: number;
 }
 
+interface PredictionRun {
+  model_id: number;
+  created_at: string;
+  prediction_count: int;
+}
+
 export default function PredictionsPage() {
   const [models, setModels] = useState<MLModel[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>("");
@@ -36,20 +42,36 @@ export default function PredictionsPage() {
   
   const [selectedStore, setSelectedStore] = useState<string>("all");
 
+  const [runs, setRuns] = useState<PredictionRun[]>([]);
+  const [selectedRun, setSelectedRun] = useState<{model_id: number, created_at: string} | null>(null);
+
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
   const fetchHistory = async () => {
     try {
+      const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const baseUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/api/predictions/history`, {
+      
+      // Fetch models
+      const resModels = await fetch(`${baseUrl}/api/predictions/history`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
+      if (resModels.ok) {
+        const data = await resModels.json();
         setModels(data.models);
-        if (data.models.length > 0) {
+        if (data.models.length > 0 && !selectedModelId) {
           setSelectedModelId(data.models[data.models.length - 1].id.toString());
         }
+      }
+
+      // Fetch runs
+      const resRuns = await fetch(`${baseUrl}/api/predictions/runs`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (resRuns.ok) {
+        const dataRuns = await resRuns.json();
+        setRuns(dataRuns);
       }
     } catch (e) {
       console.error("Failed to fetch history", e);
@@ -72,8 +94,10 @@ export default function PredictionsPage() {
     setSelectedStore("all");
     
     try {
+      const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const baseUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/api/predictions/predict`, {
+      const res = await fetch(`${baseUrl}/api/predictions/predict`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -92,10 +116,65 @@ export default function PredictionsPage() {
       
       const data = await res.json();
       setPredictions(data);
+      // Auto-select the newly generated run logically, but we also need to refresh runs
+      fetchHistory(); 
     } catch (err: any) {
       setError(err.message);
     } finally {
       setIsPredicting(false);
+    }
+  };
+
+  const handleLoadRun = async (model_id: number, created_at: string) => {
+    setError("");
+    setSelectedStore("all");
+    try {
+      const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const baseUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+      const token = localStorage.getItem("token");
+      
+      const res = await fetch(`${baseUrl}/api/predictions/runs/${model_id}/${created_at}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      
+      if (!res.ok) {
+        throw new Error("Error al cargar la predicción");
+      }
+      
+      const data = await res.json();
+      setPredictions(data);
+      setSelectedRun({ model_id, created_at });
+      setSelectedModelId(model_id.toString());
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleDeleteRun = async (model_id: number, created_at: string) => {
+    if (!confirm("¿Estás seguro de eliminar este historial de predicción?")) return;
+    
+    try {
+      const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const baseUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+      const token = localStorage.getItem("token");
+      
+      const res = await fetch(`${baseUrl}/api/predictions/runs/${model_id}/${created_at}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      
+      if (!res.ok) {
+        throw new Error("Error al eliminar la predicción");
+      }
+      
+      if (selectedRun?.model_id === model_id && selectedRun?.created_at === created_at) {
+        setPredictions([]);
+        setSelectedRun(null);
+      }
+      
+      fetchHistory();
+    } catch (err: any) {
+      setError(err.message);
     }
   };
 
@@ -214,7 +293,7 @@ export default function PredictionsPage() {
                 <LineChartIcon className="w-12 h-12 text-blue-500/50" />
               </div>
               <h3 className="text-xl font-medium text-slate-300 mb-2">Listo para Pronosticar</h3>
-              <p className="text-slate-500 max-w-md">Ajusta los parámetros a la izquierda y da click en generar para visualizar tu gráfica de proyección y las tablas de datos aquí.</p>
+              <p className="text-slate-500 max-w-md">Ajusta los parámetros a la izquierda y da click en generar para visualizar tu gráfica de proyección, o selecciona un historial de la tabla inferior.</p>
             </>
           ) : (
             <div className="w-full h-full flex flex-col">
@@ -257,6 +336,60 @@ export default function PredictionsPage() {
             </div>
           )}
         </div>
+      </div>
+      
+      {/* Prediction History */}
+      <div className="mt-8 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+        <div className="p-6 border-b border-slate-800 flex items-center gap-2">
+          <History className="w-5 h-5 text-indigo-400" />
+          <h2 className="text-lg font-semibold text-slate-200">Historial de Pronósticos</h2>
+        </div>
+        
+        {runs.length === 0 ? (
+          <div className="p-8 text-center text-slate-500">No hay predicciones guardadas todavía.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-slate-800/50 text-slate-300 uppercase text-xs">
+                <tr>
+                  <th className="px-6 py-4 font-medium">Fecha de Generación</th>
+                  <th className="px-6 py-4 font-medium">Modelo Usado</th>
+                  <th className="px-6 py-4 font-medium">Puntos Proyectados</th>
+                  <th className="px-6 py-4 font-medium text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/80">
+                {runs.map((run) => (
+                  <tr key={`${run.model_id}-${run.created_at}`} className="hover:bg-slate-800/30 transition-colors">
+                    <td className="px-6 py-4 text-slate-200 font-medium">
+                      {new Date(run.created_at).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 text-slate-400">
+                      Modelo #{run.model_id}
+                    </td>
+                    <td className="px-6 py-4 text-slate-400">
+                      {run.prediction_count}
+                    </td>
+                    <td className="px-6 py-4 flex justify-end gap-3">
+                      <button
+                        onClick={() => handleLoadRun(run.model_id, run.created_at)}
+                        className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-colors font-medium px-3 py-1.5 rounded-lg hover:bg-blue-500/10"
+                      >
+                        <Eye className="w-4 h-4" /> Ver
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRun(run.model_id, run.created_at)}
+                        className="flex items-center gap-1.5 text-red-400 hover:text-red-300 transition-colors font-medium px-3 py-1.5 rounded-lg hover:bg-red-500/10"
+                      >
+                        <Trash2 className="w-4 h-4" /> Eliminar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
