@@ -30,29 +30,29 @@ export default function Dashboard() {
         const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
         const baseUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
         const token = localStorage.getItem("token");
-        
+
         // Fetch runs
         const resRuns = await fetch(`${baseUrl}/api/predictions/runs`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
-        
+
         if (!resRuns.ok) throw new Error("Error fetching runs");
         const runs = await resRuns.json();
-        
+
         if (runs.length === 0) {
           setIsLoading(false);
           return; // No predictions yet
         }
-        
+
         // Fetch latest run details
         const latestRun = runs[0];
         const resDetails = await fetch(`${baseUrl}/api/predictions/runs/${latestRun.model_id}/${latestRun.created_at}`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
-        
+
         if (!resDetails.ok) throw new Error("Error fetching prediction details");
         const data = await resDetails.json();
-        
+
         setPredictions(data.predictions);
         setInsights(data.insights);
       } catch (err: any) {
@@ -67,16 +67,16 @@ export default function Dashboard() {
 
   const chartData = useMemo(() => {
     if (predictions.length === 0) return [];
-    
+
     // Aggregate sales by date (global)
     const aggregated: Record<string, number> = {};
-    
+
     predictions.forEach(p => {
       const dateStr = new Date(p.target_date).toLocaleDateString();
       if (!aggregated[dateStr]) aggregated[dateStr] = 0;
       aggregated[dateStr] += p.predicted_value;
     });
-    
+
     return Object.entries(aggregated)
       .map(([date, sales]) => ({ date, projected: sales }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -86,7 +86,7 @@ export default function Dashboard() {
         return {
           ...item,
           range: [
-            Math.max(0, item.projected - marginValue), 
+            Math.max(0, item.projected - marginValue),
             item.projected + marginValue
           ]
         };
@@ -111,8 +111,8 @@ export default function Dashboard() {
         <p className="text-slate-400 max-w-md">
           Aún no tienes predicciones generadas. Dirígete a la pestaña de Entrenamiento para crear tu primer modelo de pronóstico y luego genera una predicción.
         </p>
-        <Link 
-          href="/dashboard/upload" 
+        <Link
+          href="/dashboard/upload"
           className="mt-4 bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg font-medium transition-colors flex items-center gap-2"
         >
           Subir Datos <ArrowRight className="w-4 h-4" />
@@ -161,9 +161,9 @@ export default function Dashboard() {
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm flex flex-col justify-between hover:border-slate-700 transition-colors">
             <div className="flex items-center gap-3 mb-3">
               <div className={`p-2.5 rounded-lg ${insights.trend === 'upward' ? 'bg-green-500/10' : insights.trend === 'downward' ? 'bg-red-500/10' : 'bg-blue-500/10'}`}>
-                {insights.trend === 'upward' ? <TrendingUp className="w-5 h-5 text-green-400" /> : 
-                 insights.trend === 'downward' ? <TrendingDown className="w-5 h-5 text-red-400" /> : 
-                 <Minus className="w-5 h-5 text-blue-400" />}
+                {insights.trend === 'upward' ? <TrendingUp className="w-5 h-5 text-green-400" /> :
+                  insights.trend === 'downward' ? <TrendingDown className="w-5 h-5 text-red-400" /> :
+                    <Minus className="w-5 h-5 text-blue-400" />}
               </div>
               <h3 className="font-semibold text-slate-300 text-sm">Tendencia General</h3>
             </div>
@@ -234,38 +234,39 @@ export default function Dashboard() {
             <p className="text-sm text-slate-400 mt-1">Valores totales esperados en todas las tiendas</p>
           </div>
         </div>
-        
+
         <div className="h-[350px] w-full mt-4">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="4 4" stroke="#1e293b" vertical={false} />
-              <XAxis dataKey="date" stroke="#64748b" tick={{fill: '#94a3b8', fontSize: 12}} axisLine={false} tickLine={false} dy={10} />
-              <YAxis stroke="#64748b" tick={{fill: '#94a3b8', fontSize: 12}} axisLine={false} tickLine={false} dx={-10} tickFormatter={(value) => `$${(value/1000).toFixed(0)}k`} />
-              <Tooltip 
+              <XAxis dataKey="date" stroke="#64748b" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} dy={10} />
+              <YAxis stroke="#64748b" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} dx={-10} tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
+              <Tooltip
                 contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', color: '#f8fafc', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)' }}
                 itemStyle={{ color: '#a78bfa', fontWeight: 500 }}
-                formatter={(value: any, name: string) => {
-                  if (name === "range") return null;
+                formatter={(value: any, name?: string | number) => {
+                  const nameStr = String(name); // Ensure name is treated as a string
+                  if (nameStr === "range" || !nameStr) return null; // Handle undefined name or "range"
                   return [`$${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 'Proyectado'];
                 }}
                 labelStyle={{ color: '#94a3b8', marginBottom: '8px' }}
               />
-              <Area 
-                type="monotone" 
-                dataKey="range" 
-                fill="#8b5cf6" 
-                fillOpacity={0.15} 
+              <Area
+                type="monotone"
+                dataKey="range"
+                fill="#8b5cf6"
+                fillOpacity={0.15}
                 stroke="none"
                 tooltipType="none"
               />
-              <Line 
-                type="monotone" 
-                dataKey="projected" 
+              <Line
+                type="monotone"
+                dataKey="projected"
                 name="Proyectado"
-                stroke="#8b5cf6" 
+                stroke="#8b5cf6"
                 strokeWidth={3}
-                dot={{ r: 4, fill: '#8b5cf6', strokeWidth: 0 }} 
-                activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#0f172a', strokeWidth: 2 }} 
+                dot={{ r: 4, fill: '#8b5cf6', strokeWidth: 0 }}
+                activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#0f172a', strokeWidth: 2 }}
               />
             </ComposedChart>
           </ResponsiveContainer>
