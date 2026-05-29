@@ -1,6 +1,6 @@
 "use client";
 import { TrendingUp, TrendingDown, Minus, CalendarRange, DollarSign, BarChart3, LineChart as LineChartIcon, Loader2, ArrowRight } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 
@@ -79,7 +79,18 @@ export default function Dashboard() {
     
     return Object.entries(aggregated)
       .map(([date, sales]) => ({ date, projected: sales }))
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .map((item, index) => {
+        const dynamicMargin = Math.min(0.08 + (index * 0.005), 0.25);
+        const marginValue = item.projected * dynamicMargin;
+        return {
+          ...item,
+          range: [
+            Math.max(0, item.projected - marginValue), 
+            item.projected + marginValue
+          ]
+        };
+      });
   }, [predictions]);
 
   if (isLoading) {
@@ -226,33 +237,37 @@ export default function Dashboard() {
         
         <div className="h-[350px] w-full mt-4">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-              <defs>
-                <linearGradient id="colorProjected" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4}/>
-                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
+            <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="4 4" stroke="#1e293b" vertical={false} />
               <XAxis dataKey="date" stroke="#64748b" tick={{fill: '#94a3b8', fontSize: 12}} axisLine={false} tickLine={false} dy={10} />
               <YAxis stroke="#64748b" tick={{fill: '#94a3b8', fontSize: 12}} axisLine={false} tickLine={false} dx={-10} tickFormatter={(value) => `$${(value/1000).toFixed(0)}k`} />
               <Tooltip 
                 contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', color: '#f8fafc', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)' }}
                 itemStyle={{ color: '#a78bfa', fontWeight: 500 }}
-                formatter={(value: any) => [`$${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 'Proyectado']}
+                formatter={(value: any, name: string) => {
+                  if (name === "range") return null;
+                  return [`$${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 'Proyectado'];
+                }}
                 labelStyle={{ color: '#94a3b8', marginBottom: '8px' }}
               />
               <Area 
                 type="monotone" 
+                dataKey="range" 
+                fill="#8b5cf6" 
+                fillOpacity={0.15} 
+                stroke="none"
+                tooltipType="none"
+              />
+              <Line 
+                type="monotone" 
                 dataKey="projected" 
                 name="Proyectado"
                 stroke="#8b5cf6" 
-                strokeWidth={3} 
-                fillOpacity={1} 
-                fill="url(#colorProjected)" 
+                strokeWidth={3}
+                dot={{ r: 4, fill: '#8b5cf6', strokeWidth: 0 }} 
                 activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#0f172a', strokeWidth: 2 }} 
               />
-            </AreaChart>
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>

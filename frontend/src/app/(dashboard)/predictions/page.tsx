@@ -2,7 +2,8 @@
 import { LineChart as LineChartIcon, Settings2, Loader2, History, Trash2, Eye, TrendingUp, TrendingDown, Minus, CalendarRange, DollarSign, BarChart3 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import {
-  LineChart,
+  ComposedChart,
+  Area,
   Line,
   XAxis,
   YAxis,
@@ -219,8 +220,19 @@ export default function PredictionsPage() {
     
     return Object.entries(aggregated)
       .map(([date, sales]) => ({ date, sales }))
-      // Sort by date (basic sort, assumes valid date string formatting, might need proper Date parsing for complex locales)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .map((item, index) => {
+        // Base margin 8% + 0.5% per day into the future, capped at 25%
+        const dynamicMargin = Math.min(0.08 + (index * 0.005), 0.25);
+        const marginValue = item.sales * dynamicMargin;
+        return {
+          ...item,
+          range: [
+            Math.max(0, item.sales - marginValue), 
+            item.sales + marginValue
+          ]
+        };
+      });
   }, [predictions, selectedStore]);
 
   return (
@@ -316,7 +328,7 @@ export default function PredictionsPage() {
               </h3>
               <div className="flex-1 min-h-[350px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                     <XAxis 
                       dataKey="date" 
@@ -332,9 +344,22 @@ export default function PredictionsPage() {
                     <Tooltip 
                       contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '0.5rem', color: '#f8fafc' }}
                       itemStyle={{ color: '#60a5fa' }}
-                      formatter={(value: any) => [`$${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 'Ventas']}
+                      formatter={(value: any, name: string) => {
+                        if (name === "range") return null; // Hide range from tooltip
+                        return [`$${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 'Ventas'];
+                      }}
                     />
                     <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                    <Area 
+                      type="monotone" 
+                      dataKey="range" 
+                      name="Margen de Predicción" 
+                      fill="#3b82f6" 
+                      fillOpacity={0.15} 
+                      stroke="none" 
+                      legendType="none"
+                      tooltipType="none"
+                    />
                     <Line 
                       type="monotone" 
                       dataKey="sales" 
@@ -344,7 +369,7 @@ export default function PredictionsPage() {
                       dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }} 
                       activeDot={{ r: 6, stroke: '#60a5fa', strokeWidth: 2 }} 
                     />
-                  </LineChart>
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
             </div>
