@@ -77,7 +77,7 @@ export default function Dashboard() {
       aggregated[dateStr] += p.predicted_value;
     });
 
-    return Object.entries(aggregated)
+    const baseData = Object.entries(aggregated)
       .map(([date, sales]) => ({ date, projected: sales }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .map((item, index) => {
@@ -86,11 +86,31 @@ export default function Dashboard() {
         return {
           ...item,
           range: [
-            Math.max(0, item.projected - marginValue),
+            Math.max(0, item.projected - marginValue), 
             item.projected + marginValue
           ]
         };
       });
+
+    if (baseData.length > 2) {
+      const slopes = baseData.map((d, i, arr) => i === 0 ? 0 : d.projected - arr[i-1].projected);
+      const slopeChanges = slopes.map((m, i, arr) => i === 0 ? 0 : m - arr[i-1]);
+      
+      const absChanges = slopeChanges.map(Math.abs);
+      const meanChange = absChanges.reduce((a, b) => a + b, 0) / absChanges.length;
+      const stdChange = Math.sqrt(absChanges.reduce((a, b) => a + Math.pow(b - meanChange, 2), 0) / absChanges.length);
+      
+      const threshold = meanChange + (stdChange * 1.5); 
+      
+      baseData.forEach((d, i) => {
+        if (i > 1 && absChanges[i] > threshold) {
+          if (slopeChanges[i] > 0) (d as any).inflectionUp = d.projected;
+          else (d as any).inflectionDown = d.projected;
+        }
+      });
+    }
+
+    return baseData;
   }, [predictions]);
 
   if (isLoading) {
@@ -245,8 +265,8 @@ export default function Dashboard() {
                 contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', color: '#f8fafc', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)' }}
                 itemStyle={{ color: '#a78bfa', fontWeight: 500 }}
                 formatter={(value: any, name?: string | number) => {
-                  const nameStr = String(name); // Ensure name is treated as a string
-                  if (nameStr === "range" || !nameStr) return null; // Handle undefined name or "range"
+                  const nameStr = String(name);
+                  if (nameStr === "range" || nameStr === "inflectionUp" || nameStr === "inflectionDown" || !nameStr) return null;
                   return [`$${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 'Proyectado'];
                 }}
                 labelStyle={{ color: '#94a3b8', marginBottom: '8px' }}
@@ -259,14 +279,34 @@ export default function Dashboard() {
                 stroke="none"
                 tooltipType="none"
               />
-              <Line
-                type="monotone"
-                dataKey="projected"
+              <Line 
+                type="monotone" 
+                dataKey="projected" 
                 name="Proyectado"
-                stroke="#8b5cf6"
+                stroke="#8b5cf6" 
                 strokeWidth={3}
-                dot={{ r: 4, fill: '#8b5cf6', strokeWidth: 0 }}
-                activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#0f172a', strokeWidth: 2 }}
+                dot={{ r: 4, fill: '#8b5cf6', strokeWidth: 0 }} 
+                activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#0f172a', strokeWidth: 2 }} 
+              />
+              <Line 
+                type="monotone" 
+                dataKey="inflectionUp" 
+                name="Aceleración" 
+                stroke="none" 
+                dot={{ r: 5, fill: '#22c55e', strokeWidth: 2, stroke: '#0f172a' }} 
+                activeDot={false}
+                isAnimationActive={false} 
+                tooltipType="none"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="inflectionDown" 
+                name="Desaceleración" 
+                stroke="none" 
+                dot={{ r: 5, fill: '#ef4444', strokeWidth: 2, stroke: '#0f172a' }} 
+                activeDot={false}
+                isAnimationActive={false} 
+                tooltipType="none"
               />
             </ComposedChart>
           </ResponsiveContainer>

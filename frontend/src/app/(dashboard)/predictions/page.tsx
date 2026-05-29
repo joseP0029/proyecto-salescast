@@ -50,6 +50,7 @@ export default function PredictionsPage() {
   const [error, setError] = useState("");
 
   const [selectedStore, setSelectedStore] = useState<string>("all");
+  const [selectedFamily, setSelectedFamily] = useState<string>("all");
 
   const [runs, setRuns] = useState<PredictionRun[]>([]);
   const [selectedRun, setSelectedRun] = useState<{ model_id: number, created_at: string } | null>(null);
@@ -100,7 +101,6 @@ export default function PredictionsPage() {
     setIsPredicting(true);
     setError("");
     setPredictions([]);
-    setSelectedStore("all");
 
     try {
       const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
@@ -125,13 +125,9 @@ export default function PredictionsPage() {
 
       const data = await res.json();
       setPredictions(data);
-      // Generate forecast endpoint doesn't return insights yet in the same way,
-      // but wait, handlePredict calls `/predict`.
-      // The user wants insights from `/predict` as well, but wait, the prompt says
-      // "Esta información debe ser anexada a cada predicción, para que así se pueda ver en el historial que acabas de crear."
-      // Since `predict` returns a list of predictions, and we get insights from `runs`,
-      // we can fetch the run details right after generating it to get the insights cleanly.
       setIsPredicting(false);
+      setSelectedStore("all");
+      setSelectedFamily("all");
       fetchHistory();
     } catch (err: any) {
       setError(err.message);
@@ -142,6 +138,7 @@ export default function PredictionsPage() {
   const handleLoadRun = async (model_id: number, created_at: string) => {
     setError("");
     setSelectedStore("all");
+    setSelectedFamily("all");
     try {
       const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
       const baseUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
@@ -200,25 +197,34 @@ export default function PredictionsPage() {
     return Array.from(stores).sort((a, b) => a - b);
   }, [predictions]);
 
+  // Extract unique families
+  const uniqueFamilies = useMemo(() => {
+    const families = new Set<string>();
+    predictions.forEach(p => families.add(p.family));
+    return Array.from(families).sort();
+  }, [predictions]);
+
   // Format data for chart
   const chartData = useMemo(() => {
     if (predictions.length === 0) return [];
-
-    // Filter by store if needed
-    const filtered = selectedStore === "all"
-      ? predictions
-      : predictions.filter(p => p.store_nbr.toString() === selectedStore);
-
-    // Aggregate sales by date (if all stores or all families)
+    
+    // Filter by store and family if needed
+    const filtered = predictions.filter(p => {
+      const matchStore = selectedStore === "all" || p.store_nbr.toString() === selectedStore;
+      const matchFamily = selectedFamily === "all" || p.family === selectedFamily;
+      return matchStore && matchFamily;
+    });
+      
+    // Aggregate sales by date
     const aggregated: Record<string, number> = {};
-
+    
     filtered.forEach(p => {
       const dateStr = new Date(p.target_date).toLocaleDateString();
       if (!aggregated[dateStr]) aggregated[dateStr] = 0;
       aggregated[dateStr] += p.predicted_value;
     });
 
-    return Object.entries(aggregated)
+    const baseData = Object.entries(aggregated)
       .map(([date, sales]) => ({ date, sales }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .map((item, index) => {
@@ -228,12 +234,33 @@ export default function PredictionsPage() {
         return {
           ...item,
           range: [
-            Math.max(0, item.sales - marginValue),
+            Math.max(0, item.sales - marginValue), 
             item.sales + marginValue
           ]
         };
       });
-  }, [predictions, selectedStore]);
+
+    // Detect Inflection Points (Slope Changes)
+    if (baseData.length > 2) {
+      const slopes = baseData.map((d, i, arr) => i === 0 ? 0 : d.sales - arr[i-1].sales);
+      const slopeChanges = slopes.map((m, i, arr) => i === 0 ? 0 : m - arr[i-1]);
+      
+      const absChanges = slopeChanges.map(Math.abs);
+      const meanChange = absChanges.reduce((a, b) => a + b, 0) / absChanges.length;
+      const stdChange = Math.sqrt(absChanges.reduce((a, b) => a + Math.pow(b - meanChange, 2), 0) / absChanges.length);
+      
+      const threshold = meanChange + (stdChange * 1.5); // Sensitive threshold
+      
+      baseData.forEach((d, i) => {
+        if (i > 1 && absChanges[i] > threshold) {
+          if (slopeChanges[i] > 0) d.inflectionUp = d.sales;
+          else d.inflectionDown = d.sales;
+        }
+      });
+    }
+
+    return baseData;
+  }, [predictions, selectedStore, selectedFamily]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -294,18 +321,33 @@ export default function PredictionsPage() {
             </button>
 
             {predictions.length > 0 && (
-              <div className="pt-4 mt-4 border-t border-slate-800">
-                <label className="block text-sm font-medium text-slate-400 mb-2">Filtro Visual: Tienda</label>
-                <select
-                  value={selectedStore}
-                  onChange={(e) => setSelectedStore(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700/50 rounded-lg px-3 py-2.5 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                >
-                  <option value="all">Todas las Tiendas (Agrupado)</option>
-                  {uniqueStores.map(store => (
-                    <option key={store} value={store.toString()}>Tienda {store}</option>
-                  ))}
-                </select>
+              <div className="pt-4 mt-4 border-t border-slate-800 space-y-4">
+                 <div>
+                   <label className="block text-sm font-medium text-slate-400 mb-2">Filtro Visual: Tienda</label>
+                   <select 
+                    value={selectedStore}
+                    onChange={(e) => setSelectedStore(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700/50 rounded-lg px-3 py-2.5 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  >
+                    <option value="all">Todas las Tiendas (Agrupado)</option>
+                    {uniqueStores.map(store => (
+                      <option key={store} value={store.toString()}>Tienda {store}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                   <label className="block text-sm font-medium text-slate-400 mb-2">Filtro Visual: Categoría</label>
+                   <select 
+                    value={selectedFamily}
+                    onChange={(e) => setSelectedFamily(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700/50 rounded-lg px-3 py-2.5 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  >
+                    <option value="all">Todas las Categorías (Agrupado)</option>
+                    {uniqueFamilies.map(fam => (
+                      <option key={fam} value={fam}>{fam}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
           </div>
@@ -324,7 +366,10 @@ export default function PredictionsPage() {
           ) : (
             <div className="w-full h-full flex flex-col">
               <h3 className="text-xl font-medium text-slate-200 mb-6 self-start">
-                Proyección de Ventas {selectedStore === "all" ? "(Todas las Tiendas)" : `(Tienda ${selectedStore})`}
+                Proyección de Ventas 
+                <span className="text-sm font-normal text-slate-400 block mt-1">
+                  {selectedStore === "all" ? "Todas las tiendas" : `Tienda ${selectedStore}`} • {selectedFamily === "all" ? "Todas las categorías" : selectedFamily}
+                </span>
               </h3>
               <div className="flex-1 min-h-[350px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -345,30 +390,51 @@ export default function PredictionsPage() {
                       contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '0.5rem', color: '#f8fafc' }}
                       itemStyle={{ color: '#60a5fa' }}
                       formatter={(value: any, name?: string | number) => {
-                        const nameStr = String(name); // Ensure name is treated as a string
-                        if (nameStr === "range") return null; // Hide range from tooltip
+                        const nameStr = String(name);
+                        if (nameStr === "range") return null;
+                        if (nameStr === "Aceleración" || nameStr === "Desaceleración") return null;
                         return [`$${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 'Ventas'];
                       }}
                     />
                     <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                    <Area
-                      type="monotone"
-                      dataKey="range"
-                      name="Margen de Predicción"
-                      fill="#3b82f6"
-                      fillOpacity={0.15}
-                      stroke="none"
+                    <Area 
+                      type="monotone" 
+                      dataKey="range" 
+                      name="Margen de Predicción" 
+                      fill="#3b82f6" 
+                      fillOpacity={0.15} 
+                      stroke="none" 
                       legendType="none"
                       tooltipType="none"
                     />
-                    <Line
-                      type="monotone"
-                      dataKey="sales"
-                      name="Ventas Predichas"
-                      stroke="#3b82f6"
-                      strokeWidth={3}
-                      dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }}
-                      activeDot={{ r: 6, stroke: '#60a5fa', strokeWidth: 2 }}
+                    <Line 
+                      type="monotone" 
+                      dataKey="sales" 
+                      name="Ventas Predichas" 
+                      stroke="#3b82f6" 
+                      strokeWidth={3} 
+                      dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }} 
+                      activeDot={{ r: 6, stroke: '#60a5fa', strokeWidth: 2 }} 
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="inflectionUp" 
+                      name="Aceleración" 
+                      stroke="none" 
+                      dot={{ r: 5, fill: '#22c55e', strokeWidth: 2, stroke: '#0f172a' }} 
+                      activeDot={false}
+                      isAnimationActive={false} 
+                      tooltipType="none"
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="inflectionDown" 
+                      name="Desaceleración" 
+                      stroke="none" 
+                      dot={{ r: 5, fill: '#ef4444', strokeWidth: 2, stroke: '#0f172a' }} 
+                      activeDot={false}
+                      isAnimationActive={false} 
+                      tooltipType="none"
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
