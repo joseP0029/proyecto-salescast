@@ -46,13 +46,18 @@ def train_lightgbm_model(dataset_path: str, model_path: str):
     model = lgb.LGBMRegressor(n_estimators=100, random_state=42)
     model.fit(X, y)
     
+    # Extract feature importances
+    importances = model.feature_importances_
+    feature_importance_dict = {f: float(imp) for f, imp in zip(features, importances)}
+    
     # 4. Save model and metadata
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
     model_data = {
         'model': model,
         'unique_combinations': unique_combinations,
         'last_date': last_date,
-        'features': features
+        'features': features,
+        'feature_importances': feature_importance_dict
     }
     joblib.dump(model_data, model_path)
     return model_data

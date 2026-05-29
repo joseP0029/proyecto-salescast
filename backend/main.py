@@ -19,6 +19,7 @@ def startup():
         from sqlalchemy import text
         with engine.begin() as conn:
             conn.execute(text('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE NOT NULL;'))
+            conn.execute(text('ALTER TABLE ml_models ADD COLUMN IF NOT EXISTS feature_importances TEXT;'))
     except Exception as e:
         print(f"Migration error: {e}")
 

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func
 
 from database import get_db
+import json
 import models, schemas
 from routes.auth import get_current_user
 from ml_service import train_lightgbm_model, generate_predictions
@@ -61,14 +62,16 @@ def train_model(
     model_path = os.path.join(MODELS_DIR, f"model_org_{current_user.organization_id}_ds_{dataset_id}.pkl")
     
     try:
-        train_lightgbm_model(dataset.file_path, model_path)
+        model_data = train_lightgbm_model(dataset.file_path, model_path)
+        feature_importances_json = json.dumps(model_data.get('feature_importances', {}))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error training model: {str(e)}")
         
     ml_model = models.MLModel(
         dataset_id=dataset.id,
         organization_id=current_user.organization_id,
-        model_path=model_path
+        model_path=model_path,
+        feature_importances=feature_importances_json
     )
     db.add(ml_model)
     db.commit()
@@ -150,14 +153,14 @@ def get_prediction_runs(
         for r in runs
     ]
 
-@router.get("/runs/{model_id}/{created_at}", response_model=List[schemas.PredictionResponse])
+@router.get("/runs/{model_id}/{created_at}")
 def get_prediction_run_details(
     model_id: int,
     created_at: datetime,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """Obtiene los detalles de un lote específico de predicciones"""
+    """Obtiene los detalles y los insights de un lote específico de predicciones"""
     ml_model = db.query(models.MLModel).filter(
         models.MLModel.id == model_id,
         models.MLModel.organization_id == current_user.organization_id
@@ -171,7 +174,50 @@ def get_prediction_run_details(
         models.Prediction.created_at == created_at
     ).all()
     
-    return preds
+    # Parse feature importances
+    feature_importances = {}
+    if ml_model.feature_importances:
+        try:
+            feature_importances = json.loads(ml_model.feature_importances)
+        except:
+            pass
+            
+    # Compute dynamic insights
+    total_projected = sum(p.predicted_value for p in preds)
+    
+    # Aggregate sales by date to find peak day and trend
+    sales_by_date = {}
+    for p in preds:
+        date_str = p.target_date.strftime("%Y-%m-%d")
+        sales_by_date[date_str] = sales_by_date.get(date_str, 0) + p.predicted_value
+        
+    peak_day = None
+    if sales_by_date:
+        peak_day = max(sales_by_date.items(), key=lambda x: x[1])[0]
+        
+    # Simple trend calculation (comparing first half vs second half)
+    trend = "stable"
+    if len(sales_by_date) > 1:
+        dates = sorted(list(sales_by_date.keys()))
+        mid = len(dates) // 2
+        first_half = sum(sales_by_date[d] for d in dates[:mid])
+        second_half = sum(sales_by_date[d] for d in dates[mid:])
+        if second_half > first_half * 1.05:
+            trend = "upward"
+        elif second_half < first_half * 0.95:
+            trend = "downward"
+    
+    insights = {
+        "feature_importances": feature_importances,
+        "total_projected": total_projected,
+        "peak_day": peak_day,
+        "trend": trend
+    }
+    
+    return {
+        "predictions": [schemas.PredictionResponse.model_validate(p) for p in preds],
+        "insights": insights
+    }
 
 @router.delete("/runs/{model_id}/{created_at}", status_code=204)
 def delete_prediction_run(

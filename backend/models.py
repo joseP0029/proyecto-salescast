@@ -48,6 +48,7 @@ class MLModel(Base):
     dataset_id = Column(Integer, ForeignKey("datasets.id"), nullable=False)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
     model_path = Column(String, nullable=False)
+    feature_importances = Column(String, nullable=True) # JSON string
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     dataset = relationship("Dataset", backref="models")

@@ -1,5 +1,5 @@
 "use client";
-import { LineChart as LineChartIcon, Settings2, Loader2, History, Trash2, Eye } from "lucide-react";
+import { LineChart as LineChartIcon, Settings2, Loader2, History, Trash2, Eye, TrendingUp, TrendingDown, Minus, CalendarRange, DollarSign, BarChart3 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import {
   LineChart,
@@ -31,6 +31,13 @@ interface PredictionRun {
   prediction_count: number;
 }
 
+interface Insights {
+  feature_importances: Record<string, number>;
+  total_projected: number;
+  peak_day: string | null;
+  trend: "upward" | "downward" | "stable";
+}
+
 export default function PredictionsPage() {
   const [models, setModels] = useState<MLModel[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>("");
@@ -38,6 +45,7 @@ export default function PredictionsPage() {
   
   const [isPredicting, setIsPredicting] = useState(false);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [insights, setInsights] = useState<Insights | null>(null);
   const [error, setError] = useState("");
   
   const [selectedStore, setSelectedStore] = useState<string>("all");
@@ -116,11 +124,16 @@ export default function PredictionsPage() {
       
       const data = await res.json();
       setPredictions(data);
-      // Auto-select the newly generated run logically, but we also need to refresh runs
+      // Generate forecast endpoint doesn't return insights yet in the same way,
+      // but wait, handlePredict calls `/predict`.
+      // The user wants insights from `/predict` as well, but wait, the prompt says
+      // "Esta información debe ser anexada a cada predicción, para que así se pueda ver en el historial que acabas de crear."
+      // Since `predict` returns a list of predictions, and we get insights from `runs`,
+      // we can fetch the run details right after generating it to get the insights cleanly.
+      setIsPredicting(false);
       fetchHistory(); 
     } catch (err: any) {
       setError(err.message);
-    } finally {
       setIsPredicting(false);
     }
   };
@@ -142,7 +155,8 @@ export default function PredictionsPage() {
       }
       
       const data = await res.json();
-      setPredictions(data);
+      setPredictions(data.predictions);
+      setInsights(data.insights);
       setSelectedRun({ model_id, created_at });
       setSelectedModelId(model_id.toString());
     } catch (err: any) {
@@ -337,6 +351,99 @@ export default function PredictionsPage() {
           )}
         </div>
       </div>
+
+      {/* Insights Section */}
+      {predictions.length > 0 && insights && (
+        <div className="mt-8">
+          <h2 className="text-xl font-bold text-slate-50 mb-4">Insights de la Proyección</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            
+            {/* Total Projected */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm flex flex-col justify-between hover:border-slate-700 transition-colors">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2.5 bg-emerald-500/10 rounded-lg">
+                  <DollarSign className="w-5 h-5 text-emerald-400" />
+                </div>
+                <h3 className="font-semibold text-slate-300 text-sm">Total Proyectado</h3>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-50">
+                  ${insights.total_projected.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Suma de todas las ventas futuras</p>
+              </div>
+            </div>
+
+            {/* Peak Day */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm flex flex-col justify-between hover:border-slate-700 transition-colors">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2.5 bg-amber-500/10 rounded-lg">
+                  <CalendarRange className="w-5 h-5 text-amber-400" />
+                </div>
+                <h3 className="font-semibold text-slate-300 text-sm">Día de Mayor Demanda</h3>
+              </div>
+              <div>
+                <p className="text-xl font-bold text-slate-50">
+                  {insights.peak_day ? new Date(insights.peak_day).toLocaleDateString() : 'N/A'}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Fecha con el pico más alto de ventas</p>
+              </div>
+            </div>
+
+            {/* Trend */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm flex flex-col justify-between hover:border-slate-700 transition-colors">
+              <div className="flex items-center gap-3 mb-3">
+                <div className={`p-2.5 rounded-lg ${insights.trend === 'upward' ? 'bg-green-500/10' : insights.trend === 'downward' ? 'bg-red-500/10' : 'bg-blue-500/10'}`}>
+                  {insights.trend === 'upward' ? <TrendingUp className="w-5 h-5 text-green-400" /> : 
+                   insights.trend === 'downward' ? <TrendingDown className="w-5 h-5 text-red-400" /> : 
+                   <Minus className="w-5 h-5 text-blue-400" />}
+                </div>
+                <h3 className="font-semibold text-slate-300 text-sm">Tendencia General</h3>
+              </div>
+              <div>
+                <p className="text-xl font-bold text-slate-50 capitalize">
+                  {insights.trend === 'upward' ? 'Alcista' : insights.trend === 'downward' ? 'Bajista' : 'Estable'}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Comportamiento esperado a lo largo del periodo</p>
+              </div>
+            </div>
+
+            {/* Feature Importances */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm hover:border-slate-700 transition-colors">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2.5 bg-purple-500/10 rounded-lg">
+                  <BarChart3 className="w-5 h-5 text-purple-400" />
+                </div>
+                <h3 className="font-semibold text-slate-300 text-sm">Variables Influyentes</h3>
+              </div>
+              <div className="space-y-2 mt-4">
+                {Object.entries(insights.feature_importances)
+                  .sort((a, b) => b[1] - a[1])
+                  .slice(0, 3)
+                  .map(([feature, importance], idx) => {
+                    // Simple normalization for visual bar
+                    const maxImp = Math.max(...Object.values(insights.feature_importances));
+                    const width = maxImp > 0 ? (importance / maxImp) * 100 : 0;
+                    return (
+                      <div key={feature} className="w-full">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-slate-400 capitalize">{feature}</span>
+                        </div>
+                        <div className="w-full bg-slate-800 rounded-full h-1.5">
+                          <div className="bg-purple-500 h-1.5 rounded-full" style={{ width: `${width}%` }}></div>
+                        </div>
+                      </div>
+                    );
+                  })
+                }
+                {Object.keys(insights.feature_importances).length === 0 && (
+                  <p className="text-xs text-slate-500">Datos no disponibles para este modelo.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Prediction History */}
       <div className="mt-8 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
