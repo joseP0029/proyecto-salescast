@@ -88,7 +88,9 @@ export default function Dashboard() {
           range: [
             Math.max(0, item.projected - marginValue), 
             item.projected + marginValue
-          ]
+          ],
+          inflectionUp: undefined as number | undefined,
+          inflectionDown: undefined as number | undefined
         };
       });
 
@@ -104,8 +106,8 @@ export default function Dashboard() {
       
       baseData.forEach((d, i) => {
         if (i > 1 && absChanges[i] > threshold) {
-          if (slopeChanges[i] > 0) (d as any).inflectionUp = d.projected;
-          else (d as any).inflectionDown = d.projected;
+          if (slopeChanges[i] > 0) d.inflectionUp = d.projected;
+          else d.inflectionDown = d.projected;
         }
       });
     }

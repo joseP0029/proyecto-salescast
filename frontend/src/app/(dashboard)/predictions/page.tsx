@@ -236,7 +236,9 @@ export default function PredictionsPage() {
           range: [
             Math.max(0, item.sales - marginValue), 
             item.sales + marginValue
-          ]
+          ],
+          inflectionUp: undefined as number | undefined,
+          inflectionDown: undefined as number | undefined
         };
       });
 
